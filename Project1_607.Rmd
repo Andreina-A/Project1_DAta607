@@ -1,0 +1,138 @@
+---
+title: "Project 1"
+author: "Andreina A"
+date: "2024-10-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+Given a text file with the results of a chess tournament, I had to create a R Markdown file that generates the .CSV file and it had to have the players name, player’s state, total number of points, player’s pre-Rating, and average pre chess rating of opponents. For the text file, I was able to imported into R markdown and transform it into a data frame in which I used regex and other functions to remove items would unnecessary or create nulls for my analysis.
+
+Data:https://raw.githubusercontent.com/Andreina-A/Project1_DAta607/refs/heads/main/tournamentinfo.txt
+
+Loaded needed packages
+```{r}
+library(tidyverse)
+```
+
+##Loading data
+
+The data set provided in a text form was uploaded into github in order to obtain the raw data to work with in R. I used read.delim since the data is separated by delimiter of "|". I also displayed the head of the data set.
+```{r pressure, echo=FALSE}
+DF<-read.delim('https://raw.githubusercontent.com/Andreina-A/Project1_DAta607/refs/heads/main/tournamentinfo.txt', header = FALSE, sep='|', )
+head(DF)
+```
+
+
+
+Created a data frame for the data set and removed the dashes that divided the rows by using the negative sequence function. 
+```{r}
+DF_corrected<-data.frame(DF[-seq(1,nrow(DF),3),], "") 
+```
+
+Combined rows together by locating the odds and even rows and afterwards removed the empty columns created from combining the rows.
+```{r}
+Chess_DF<-data.frame(cbind(DF_corrected[(seq(nrow(DF_corrected))%%2)==1,],#Odd rows
+                                DF_corrected[(seq(nrow(DF_corrected))%% 2)==0,]))#Even row
+Chess_DF$X..<-NULL
+Chess_DF$X...1<-NULL
+
+head(Chess_DF)
+```                                      
+
+
+#Created a data frame of the players, started by renaming the columns, I only renamed the columns needed such as the player’s name, player’s state, total score, rounds, and the player’s pre-Rating. I started by remove some columns that were unnecessary.
+```{r}
+Chess_players<-Chess_DF[,-c(11,14:22)]
+
+Chess_players<-Chess_players%>%rename("Player_number"=V1, "Player_name"=V2,"Total_score"=V3, "Round1"=V4, "Round2"=V5,"Round3"=V6,"Round4"=V7,"Round5"=V8,"Round6"=V9,"Round7"=V10,"Players_State"=V1.1,"Pre_rating"=V2.1)#Renamed the columns
+```
+
+
+#Removed the row with the old column titles that came with the data.
+```{r}
+Chess_players<-Chess_players[-c(1),]
+
+```
+
+
+#Fixing player ratings
+
+I fixed the players pre rating to display only the integers of the pre rating. I started by using the string remove all function with regular expressions(regex) to removing every item before the colon (which is before the pre-rating value) and every item after the dash, and only the pre rating values should be left behind. Some values add P with a score afterward, which I removed as well since it is not needed for our calculations. Lastly, I made the values numerical to use for calculations.
+```{r}
+Chess_players$Pre_rating<-str_remove_all(Chess_players$Pre_rating, ".*:")#remove all items before the colon.
+Chess_players$Pre_rating<-str_remove_all(Chess_players$Pre_rating, "-.*")#remove all items after the dash.
+Chess_players$Pre_rating<-str_remove_all(Chess_players$Pre_rating, "P.*")#removed all items after the P
+Chess_players$Pre_rating<-as.numeric(Chess_players$Pre_rating) #turned the values numerical for calculations.
+```
+
+#Fixing rounds
+
+Using regex again I removed all letters that came before the numbers in the round columns and I also turned the values into integers to use in the loop I'll created, I also turned the player number into an integer to use for the loop.
+```{r}
+Chess_players$Round1<-as.integer(gsub("^\\D+","",Chess_players$Round1))
+Chess_players$Round2<-as.integer(gsub("^\\D+","",Chess_players$Round2))
+Chess_players$Round3<-as.integer(gsub("^\\D+","",Chess_players$Round3))
+Chess_players$Round4<-as.integer(gsub("^\\D+","",Chess_players$Round4))
+Chess_players$Round5<-as.integer(gsub("^\\D+","",Chess_players$Round5))
+Chess_players$Round6<-as.integer(gsub("^\\D+","",Chess_players$Round6))
+Chess_players$Round7<-as.integer(gsub("^\\D+","",Chess_players$Round7))
+Chess_players$Player_number<-as.integer(as.character(Chess_players$Player_number))
+head(Chess_players)
+```
+
+#Created column for average Pre Chess Rating of Opponents
+
+Create a empty column to add the values for average pre chess rating of opponents.
+```{r}
+Chess_players$Average_PR_Opp=NA
+```
+
+Created a loop to calculate the average of the players, by taking the value of each round to find the corresponding opponents' player number to obtain their pre rating. Once the pre rating of the opponent is found it is added together and divided by the number of rounds played, this gave me the average of the opponents' pre ratings.
+```{r}
+for (i in 1:nrow(Chess_players)) { 
+  OppR=c()#created an empty vector to loop through opponent’s pre rating
+  #Calculate the average of the pre-rating with only the pre rating's of the opponents that played with the player in corresponding rounds.
+  for (s in c(4:10)){ #will loop through to obtain values for the vector.
+    if (is.na(Chess_players[1,s])==FALSE) {
+      OppR=c(OppR, Chess_players$Pre_rating[Chess_players$Player_number==Chess_players[i,s]])
+    }
+  }
+  Chess_players[i,"Average_PR_Opp"]<-round(mean(OppR), digits = 0)#to the Average PR Opp column add the values appended values into the OppR vector using the loop created and round the value to have zero decimal points
+}
+head(Chess_players)
+```
+
+#Final step for the data frame 
+
+Removed columns no longer needed.
+```{r}
+Chess_players[,c(1,4:10)]<-NULL
+head(Chess_players)
+```
+#Reorganized columns to display Name of the player, state, Total score, their pre rating, and their opponents pre rating avergae.
+
+```{r}
+Chess_players<-Chess_players[,c(1,3,2,4,5)]
+head(Chess_players)
+```
+
+#Make data frame as CSV file and test
+
+```{r}
+write_csv(Chess_players,file="Chess_Players_Pre_ratings.csv")
+Test<-read_csv("Chess_Players_Pre_ratings.csv", show_col_types = FALSE)
+head(Test)
+```
+
+```{r}
+Test<-Test[order(Test$Average_PR_Opp, decreasing= TRUE),]
+head(Test)
+```
+Conclusion
+
+The text file was successful created into a CSV file, by transforming and tdying the data. Using functions R to remove anomalies allowed me to perform an analyze on the average of pre ratings on opponents from the chess tournament results. Based on the Average of pre rating for opponents Gary Hua had the most average rate for opponents, meaning he won against players with high pre rating, meaning he might be a tough chess player to beat.
